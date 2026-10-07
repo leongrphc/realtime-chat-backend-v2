@@ -132,7 +132,7 @@ export default function Chat() {
   }
   async function authenticate(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
-    try { setUser(await post<User>(`/auth/${register ? 'register' : 'login'}`, { email, password, ...(register ? { name } : {}) })); setPassword(''); }
+    try { setUser(await post<User>(`/auth/${register ? 'register' : 'login'}`, { email, password, ...(register ? { name } : {}) })); setPassword(''); setRegister(false); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   async function createChat(event: FormEvent) {
