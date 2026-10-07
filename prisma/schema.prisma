@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique
+  name String
+  passwordHash String
+  createdAt DateTime @default(now())
+  sessions Session[]
+  memberships Membership[]
+  messages Message[]
+  attachments Attachment[]
+  notifications Notification[]
+}
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+  kind String
+  name String?
+  directKey String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  members Membership[]
+  messages Message[]
+  attachments Attachment[]
+}
+model Membership {
+  conversationId String @db.Uuid
+  userId String @db.Uuid
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role String @default("member")
+  lastReadSeq BigInt @default(0)
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+  seq BigInt @unique @default(autoincrement())
+  conversationId String @db.Uuid
+  senderId String @db.Uuid
+  clientId String @db.Uuid
+  body String
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id])
+  attachments Attachment[]
+  notifications Notification[]
+  @@unique([senderId, clientId])
+  @@index([conversationId, seq(sort: Desc)])
+}
+model Attachment {
+  id String @id @default(uuid()) @db.Uuid
+  conversationId String @db.Uuid
+  uploaderId String @db.Uuid
+  messageId String? @db.Uuid
+  key String @unique
+  name String
+  mime String
+  size Int
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaderId], references: [id])
+  message Message? @relation(fields: [messageId], references: [id])
+  @@index([conversationId])
+}
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  messageId String @db.Uuid
+  createdAt DateTime @default(now())
+  readAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  @@unique([userId, messageId])
+  @@index([userId, createdAt(sort: Desc), id])
+}

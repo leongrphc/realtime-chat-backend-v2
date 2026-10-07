@@ -1,0 +1,60 @@
+{
+  "name": "plain-realtime-chat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "tsx watch --env-file=.env src/server/index.ts",
+    "dev:web": "next dev",
+    "build": "prisma generate && tsc -p tsconfig.server.json && next build",
+    "start:api": "node --env-file=.env dist/server/index.js",
+    "start:web": "next start",
+    "lint": "eslint .",
+    "typecheck": "prisma generate && tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest run",
+    "test:integration": "node scripts/test-integration.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@prisma/client": "6.19.3",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "cookie": "^1.0.2",
+    "cors": "^2.8.5",
+    "express": "5.2.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "next": "16.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "redis": "^5.9.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prisma": "6.19.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "5.0.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
+  }
+}
