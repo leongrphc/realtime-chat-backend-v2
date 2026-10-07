@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 const config: NextConfig = {
+  ...(process.env.STATIC_EXPORT === 'true' ? { output: 'export' as const } : {}),
   poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: [

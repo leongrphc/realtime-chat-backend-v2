@@ -8,6 +8,7 @@ import { sessionFor } from './auth';
 import { publicError, AppError, uuid } from './core';
 import { markRead, requireMember, sendMessage, wire } from './chat';
 import { presence, rateLimit, touchPresence } from './resources';
+import { clientAddress, trustedEdge } from './proxy';
 export async function recipients(r: Resources, conversationId: string) {
   return (await r.db.membership.findMany({ where: { conversationId }, select: { userId: true } })).map(m => `user:${m.userId}`);
 }
@@ -30,7 +31,7 @@ export async function realtime(http: HttpServer, r: Resources, config: Config) {
   await Promise.all([pub.connect(), sub.connect()]);
   const io = new Server(http, { transports: ['websocket'], maxHttpBufferSize: 20000,
     cors: { origin: config.WEB_ORIGIN, credentials: true },
-    allowRequest: (req, callback) => callback(null, req.headers.origin === config.WEB_ORIGIN) });
+    allowRequest: (req, callback) => callback(null, req.headers.origin === config.WEB_ORIGIN && (!config.EDGE_PROXY_SECRET || trustedEdge(req, config))) });
   io.adapter(createAdapter(pub, sub));
   let closing = false;
   const pending = new Set<Promise<unknown>>();
@@ -41,7 +42,7 @@ export async function realtime(http: HttpServer, r: Resources, config: Config) {
   };
   io.use(async (socket, next) => {
     try {
-      await rateLimit(r, `socket-connect:${socket.handshake.address}`, 60);
+      await rateLimit(r, `socket-connect:${clientAddress(socket.request, config)}`, 60);
       const session = await sessionFor(r, socket.handshake.headers.cookie);
       socket.data.userId = session.userId;
       socket.data.sessionId = session.id;

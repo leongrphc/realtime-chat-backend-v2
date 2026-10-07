@@ -14,6 +14,7 @@ import { clearSessionCookie, createSession, sessionFor } from './auth';
 import { AppError, detectFile, hashPassword, loginSchema, publicError, registerSchema, safeFilename, safeUser, uuid, verifyPassword } from './core';
 import { createConversation, listConversations, listMessages, listNotifications, markRead, requireMember, sendMessage, wire } from './chat';
 import { peers, publishMessage, realtime, recipients } from './realtime';
+import { clientAddress, trustedEdge } from './proxy';
 export async function createApplication(config: Config) {
   const r = resources(config);
   await Promise.all([r.db.$connect(), r.redis.connect()]);
@@ -28,17 +29,19 @@ export async function createApplication(config: Config) {
   app.get('/health/live', (_req, res) => { res.json({ status: 'ok' }); });
   app.get('/health/ready', async (_req, res) => {
     try {
-      await Promise.all([r.db.$queryRaw`SELECT 1`, r.redis.set('health:write-probe', '1', { EX: 5 }), r.s3.send(new HeadBucketCommand({ Bucket: config.S3_BUCKET }))]);
+      await Promise.all([r.db.$queryRaw`SELECT 1`, r.redis.set('health:write-probe', '1', { EX: 5 }),
+        ...(config.UPLOADS_ENABLED ? [r.s3.send(new HeadBucketCommand({ Bucket: config.S3_BUCKET }))] : [])]);
       res.json({ status: 'ready' });
     } catch { res.status(503).json({ status: 'unavailable' }); }
   });
   app.use('/api', async (req, _res, next) => {
+    if (config.EDGE_PROXY_SECRET && !trustedEdge(req, config)) throw new AppError(403, 'FORBIDDEN');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin !== config.WEB_ORIGIN) throw new AppError(403, 'INVALID_ORIGIN');
-    await rateLimit(r, `http:${req.ip}`, 300);
+    await rateLimit(r, `http:${clientAddress(req, config)}`, 300);
     next();
   });
   app.post('/api/auth/register', async (req, res) => {
-    await rateLimit(r, `auth:${req.ip}`, 10);
+    await rateLimit(r, `auth:${clientAddress(req, config)}`, 10);
     const data = registerSchema.parse(req.body);
     const passwordHash = await hashPassword(data.password);
     try {
@@ -51,7 +54,7 @@ export async function createApplication(config: Config) {
     }
   });
   app.post('/api/auth/login', async (req, res) => {
-    await rateLimit(r, `auth:${req.ip}`, 10);
+    await rateLimit(r, `auth:${clientAddress(req, config)}`, 10);
     const data = loginSchema.parse(req.body);
     const user = await r.db.user.findUnique({ where: { email: data.email } });
     const valid = await verifyPassword(data.password, user?.passwordHash ?? `${'0'.repeat(32)}:${'0'.repeat(128)}`);
@@ -109,6 +112,7 @@ export async function createApplication(config: Config) {
   });
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 0, parts: 1 } });
   app.post('/api/conversations/:id/files', async (req, res, next) => {
+    if (!config.UPLOADS_ENABLED) throw new AppError(503, 'UPLOADS_DISABLED');
     await requireMember(r, res.locals.user.id, String(req.params.id));
     await rateLimit(r, `upload:${res.locals.user.id}`, 10);
     next();
@@ -127,6 +131,7 @@ export async function createApplication(config: Config) {
     }
   });
   app.get('/api/files/:id/download', async (req, res) => {
+    if (!config.UPLOADS_ENABLED) throw new AppError(503, 'UPLOADS_DISABLED');
     const id = uuid.parse(req.params.id);
     const file = await r.db.attachment.findUnique({ where: { id } });
     if (!file) throw new AppError(404, 'NOT_FOUND');

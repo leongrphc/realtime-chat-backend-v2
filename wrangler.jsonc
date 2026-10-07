@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "plain-chat-web",
+  "account_id": "df414b176985bb15c627a0ac1f82e85d",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-10-07",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "chat.mozkan.com.tr", "custom_domain": true }],
+  "assets": { "directory": "./out", "binding": "ASSETS", "run_worker_first": ["/api/*", "/socket.io/*", "/health/*"] },
+  "vars": { "API_ORIGIN": "https://plain-chat-api.onrender.com" }
+}

@@ -6,12 +6,14 @@ import { mergeConversations, mergeMessages } from './state';
 import type { Conversation, FileInfo, Message, Notice, Page, Send, User } from './types';
 const errorText = (e: unknown) => e instanceof Error ? e.message : 'REQUEST_FAILED';
 const title = (c: Conversation, userId: string) => c.kind === 'group' ? c.name : c.members.find(m => m.userId !== userId)?.user.name ?? 'Direct chat';
+const demo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const uploadsEnabled = process.env.NEXT_PUBLIC_UPLOADS_ENABLED !== 'false';
 export default function Chat() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [register, setRegister] = useState(false);
-  const [email, setEmail] = useState('ada@demo.local');
-  const [password, setPassword] = useState('DemoPassword123!');
+  const [email, setEmail] = useState(demo ? 'ada@demo.local' : '');
+  const [password, setPassword] = useState(demo ? 'DemoPassword123!' : '');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -188,7 +190,7 @@ export default function Chat() {
       <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={10} maxLength={128} autoComplete={register ? 'new-password' : 'current-password'} /></label>
       <button disabled={busy}>{busy ? 'Please wait…' : register ? 'Register' : 'Sign in'}</button>
       <button type="button" onClick={() => { setRegister(v => !v); setError(''); }}>{register ? 'Use an existing account' : 'Create account'}</button>
-    </form><p className="muted">Demo accounts: ada@demo.local, bora@demo.local, cem@demo.local<br />Password: DemoPassword123!</p>{error && <p role="alert">{error}</p>}</main>;
+    </form>{demo && <p className="muted">Demo accounts: ada@demo.local, bora@demo.local, cem@demo.local<br />Password: DemoPassword123!</p>}{error && <p role="alert">{error}</p>}</main>;
   return <main><header><div><h1>Plain Chat</h1><p>{user.name} · {connected ? 'Realtime connected' : 'Realtime disconnected · HTTP available'}</p></div>
     <button onClick={() => { void post('/auth/logout', {}).then(() => { setUser(null); setSelected(null); setMessages([]); setConversations([]); setDraft(''); setFiles([]); setPending(null); }).catch(e => setError(errorText(e))); }}>Sign out</button></header>
     {error && <p role="alert" className="error">{error} <button onClick={() => setError('')}>Dismiss</button></p>}
@@ -212,7 +214,7 @@ export default function Chat() {
         {!messages.length && <p className="muted">{search ? 'No matching messages.' : 'No messages loaded.'}</p>}
         <p className="typing" aria-live="polite">{Object.keys(typing).map(id => current.members.find(m => m.userId === id)?.user.name).filter(Boolean).join(', ')}{Object.keys(typing).length ? ' is typing…' : ''}</p>
         <form className="composer" onSubmit={send}><label>Message<textarea value={draft} disabled={!!pending} maxLength={4000} rows={3} onChange={e => { setDraft(e.target.value); if (Date.now() - typingSent.current > 1500) { socketRef.current?.emit('typing:set', { conversationId: selected, typing: true }); typingSent.current = Date.now(); } }} onBlur={() => socketRef.current?.emit('typing:set', { conversationId: selected, typing: false })} /></label>
-          <label>Attach file (10 MiB; text, PDF, PNG, JPEG, ZIP)<input type="file" disabled={busy || !!pending || files.length >= 5} accept="text/plain,application/pdf,image/png,image/jpeg,application/zip" onChange={e => { if (e.target.files?.[0]) void upload(e.target.files[0]); e.target.value = ''; }} /></label>
+          {uploadsEnabled && <label>Attach file (10 MiB; text, PDF, PNG, JPEG, ZIP)<input type="file" disabled={busy || !!pending || files.length >= 5} accept="text/plain,application/pdf,image/png,image/jpeg,application/zip" onChange={e => { if (e.target.files?.[0]) void upload(e.target.files[0]); e.target.value = ''; }} /></label>}
           {files.map(f => <p key={f.id}>{f.name} <button type="button" disabled={!!pending} onClick={() => setFiles(old => old.filter(item => item.id !== f.id))}>Remove</button></p>)}
           <div className="actions"><button disabled={sending || busy || (!draft.trim() && !files.length)}>{sending ? 'Sending…' : pending ? 'Retry same message' : 'Send'}</button><button type="button" disabled={sending || !!pending} onClick={() => { setDraft(''); setFiles([]); }}>Clear draft</button></div>
           {pending && !sending && <p className="muted">Delivery may already have succeeded. Retry keeps the same ID and cannot create a duplicate. <button type="button" onClick={() => { setPending(null); setDraft(''); setFiles([]); if (selected) void reloadMessages(selected, search).catch(e => setError(errorText(e))); }}>Stop retrying and clear draft</button></p>}</form></> : <p>Select a conversation or create one.</p>}</section></div></main>;

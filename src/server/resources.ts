@@ -8,7 +8,7 @@ export function resources(config: Config) {
   const redis = createClient({ url: config.REDIS_URL });
   redis.on('error', () => console.error('Redis connection error'));
   const opts = { region: config.S3_REGION, forcePathStyle: config.S3_FORCE_PATH_STYLE,
-    credentials: { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY } };
+    credentials: config.S3_ACCESS_KEY && config.S3_SECRET_KEY ? { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY } : undefined };
   const s3 = new S3Client({ ...opts, endpoint: config.S3_ENDPOINT });
   const downloadS3 = new S3Client({ ...opts, endpoint: config.S3_PUBLIC_ENDPOINT ?? config.S3_ENDPOINT });
   return { db, redis, s3, downloadS3 };

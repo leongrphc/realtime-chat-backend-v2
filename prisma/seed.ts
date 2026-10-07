@@ -6,10 +6,12 @@ async function seed() {
   const config = readConfig();
   const db = new PrismaClient();
   const s3 = new S3Client({ endpoint: config.S3_ENDPOINT, region: config.S3_REGION, forcePathStyle: config.S3_FORCE_PATH_STYLE,
-    credentials: { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY } });
+    credentials: config.S3_ACCESS_KEY && config.S3_SECRET_KEY ? { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY } : undefined });
   try {
-    try { await s3.send(new HeadBucketCommand({ Bucket: config.S3_BUCKET })); }
-    catch { await s3.send(new CreateBucketCommand({ Bucket: config.S3_BUCKET })); }
+    if (config.UPLOADS_ENABLED) {
+      try { await s3.send(new HeadBucketCommand({ Bucket: config.S3_BUCKET })); }
+      catch { await s3.send(new CreateBucketCommand({ Bucket: config.S3_BUCKET })); }
+    }
     const passwordHash = await hashPassword('DemoPassword123!');
     const users = await Promise.all(['Ada', 'Bora', 'Cem'].map((name, i) => db.user.upsert({ where: { email: `${name.toLowerCase()}@demo.local` }, update: {},
       create: { id: `00000000-0000-4000-8000-00000000000${i + 1}`, email: `${name.toLowerCase()}@demo.local`, name, passwordHash } })));

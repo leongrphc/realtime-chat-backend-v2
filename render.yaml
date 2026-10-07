@@ -1,0 +1,38 @@
+# Cloudflare serves the exported frontend; PostgreSQL is hosted on Neon.
+services:
+  - type: web
+    name: plain-chat-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build:api
+    startCommand: node scripts/migrate-production.mjs && npm run start:api
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        value: https://chat.mozkan.com.tr
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: UPLOADS_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: EDGE_PROXY_SECRET
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: plain-chat-redis
+          property: connectionString
+  - type: keyvalue
+    name: plain-chat-redis
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
