@@ -33,6 +33,7 @@ export default function Chat() {
   const [users, setUsers] = useState<User[]>([]);
   const [userQuery, setUserQuery] = useState('');
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [chatError, setChatError] = useState('');
   const [groupName, setGroupName] = useState('');
   const [group, setGroup] = useState(false);
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -136,7 +137,13 @@ export default function Chat() {
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   async function createChat(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault(); setChatError('');
+    if (!memberIds.length) {
+      setChatError(users.length ? 'Select a person below Find people to start a chat.' : 'No person is selected. Ask someone to create an account, then find and select them here.');
+      return;
+    }
+    if (memberIds.length > 19) { setChatError('Select at most 19 people.'); return; }
+    setBusy(true); setError('');
     try {
       const c = await post<Conversation>('/conversations', { kind: group ? 'group' : 'direct', userIds: memberIds, ...(group ? { name: groupName } : {}) });
       await reloadConversations(); selectConversation(c.id); setMemberIds([]); setGroupName('');
@@ -200,8 +207,11 @@ export default function Chat() {
         <label><input type="checkbox" checked={group} onChange={e => { setGroup(e.target.checked); setMemberIds([]); }} /> Group chat</label>
         {group && <label>Group name<input value={groupName} onChange={e => setGroupName(e.target.value)} maxLength={80} required /></label>}
         <label>Find people<input value={userQuery} onChange={e => setUserQuery(e.target.value)} placeholder="Name or email" maxLength={100} /></label>
-        <div className="people">{users.map(u => <label key={u.id}><input type={group ? 'checkbox' : 'radio'} name="person" checked={memberIds.includes(u.id)} onChange={e => setMemberIds(old => group ? e.target.checked ? [...old, u.id] : old.filter(id => id !== u.id) : [u.id])} />{u.name} <small>{u.email}</small></label>)}</div>
-        <button disabled={busy || !memberIds.length || memberIds.length > 19}>Create chat</button></form></section>
+        <div className="people">{users.map(u => <label key={u.id}><input type={group ? 'checkbox' : 'radio'} name="person" checked={memberIds.includes(u.id)} onChange={e => { setChatError(''); setMemberIds(old => group ? e.target.checked ? [...old, u.id] : old.filter(id => id !== u.id) : [u.id]); }} />{u.name} <small>{u.email}</small></label>)}</div>
+        {!users.length && <p className="muted">No other people found. Ask someone to create an account, then search for their name or email.</p>}
+        {users.length > 0 && !memberIds.length && <p className="muted">Select {group ? 'people' : 'a person'} from the list to start a chat.</p>}
+        {chatError && <p role="alert">{chatError}</p>}
+        <button disabled={busy}>Create chat</button></form></section>
       <section><h2>Notifications ({unread} unread)</h2><button onClick={() => { if ('Notification' in window) void Notification.requestPermission().then(p => { setDesktop(p === 'granted'); if (p !== 'granted') setError('Desktop notifications were not allowed.'); }); else setError('Desktop notifications are unavailable in this browser.'); }}>{desktop ? 'Desktop notifications enabled' : 'Enable desktop notifications'}</button>
         <ul className="notices">{notices.map(n => <li key={n.id}><button onClick={() => { selectConversation(n.message.conversationId); void post(`/notifications/${n.id}/read`, {}).then(reloadNotices).catch(e => setError(errorText(e))); }}>{n.readAt ? '' : 'Unread · '}{n.message.sender.name}: {n.message.body.slice(0, 60) || 'File attachment'}</button></li>)}</ul>
         {noticeCursor && <button onClick={() => { void api<Page<Notice> & { unread: number }>(`/notifications?cursor=${noticeCursor}`).then(page => { setNotices(old => [...new Map([...old, ...page.items].map(n => [n.id, n])).values()]); setNoticeCursor(page.nextCursor); }).catch(e => setError(errorText(e))); }}>Older notifications</button>}</section></aside>
